@@ -34,10 +34,3 @@ class LutronCasetaButton(LutronCasetaDevice, ButtonEntity):
     async def async_press(self) -> None:
         """Send a button press event."""
         await self._smartbridge.tap_button(self.device_id)
-
-    @property
-    def unique_id(self) -> str:
-        """Return a unique identifier if serial number is None."""
-        if self.serial is None:
-            return f"button_{self._bridge_unique_id}_{self.device_id}"
-        return super().unique_id
