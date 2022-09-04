@@ -74,6 +74,7 @@ CONFIG_SCHEMA = vol.Schema(
 
 PLATFORMS = [
     Platform.BINARY_SENSOR,
+    Platform.BUTTON,
     Platform.COVER,
     Platform.FAN,
     Platform.LIGHT,
@@ -382,7 +383,10 @@ class LutronCasetaDevice(Entity):
     @property
     def extra_state_attributes(self):
         """Return the state attributes."""
-        return {"device_id": self.device_id, "zone_id": self._device["zone"]}
+        attribs = {"device_id": self.device_id}
+        if self._device.get("zone"):
+            attribs["zone_id"] = self._device["zone"]
+        return attribs
 
 
 class LutronCasetaDeviceUpdatableEntity(LutronCasetaDevice):
