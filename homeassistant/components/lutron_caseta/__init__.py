@@ -182,6 +182,7 @@ async def async_setup_entry(
         hass, entry_id, bridge_device, buttons
     )
     _async_subscribe_pico_remote_events(hass, bridge, buttons)
+    _async_register_keypad_devices(hass, entry_id, bridge, bridge_device)
 
     # Store this bridge (keyed by entry_id) so it can be retrieved by the
     # platforms we're setting up.
@@ -196,18 +197,104 @@ async def async_setup_entry(
 
 @callback
 def _async_register_bridge_device(
-    hass: HomeAssistant, config_entry_id: str, bridge_device: dict
+    hass: HomeAssistant,
+    config_entry_id: str,
+    bridge_device: dict,
 ) -> None:
     """Register the bridge device in the device registry."""
     device_registry = dr.async_get(hass)
-    device_registry.async_get_or_create(
-        name=bridge_device["name"],
-        manufacturer=MANUFACTURER,
-        config_entry_id=config_entry_id,
-        identifiers={(DOMAIN, bridge_device["serial"])},
-        model=f"{bridge_device['model']} ({bridge_device['type']})",
-        configuration_url="https://device-login.lutron.com",
-    )
+
+    name = bridge_device["name"]
+    if bridge_device.get("device_type"):
+        # If this is an RA3/HomeWorks QSX processor, give a better name
+        name = bridge_device.get("device_type")
+
+    device_args: dict[str, Any] = {
+        "name": name,
+        "manufacturer": MANUFACTURER,
+        "config_entry_id": config_entry_id,
+        "identifiers": {(DOMAIN, bridge_device["serial"])},
+        "model": f"{bridge_device['model']} ({bridge_device['type']})",
+        "configuration_url": "https://device-login.lutron.com",
+    }
+
+    area, _ = _area_and_name_from_name(bridge_device["name"])
+    bridge_area = bridge_device.get("area_name")
+    if bridge_area is not None:
+        area = bridge_area
+    if area != UNASSIGNED_AREA:
+        device_args["suggested_area"] = area
+
+    device_registry.async_get_or_create(**device_args)
+
+
+@callback
+def _async_register_keypad_devices(
+    hass: HomeAssistant, config_entry_id: str, bridge: Smartbridge, bridge_device: dict
+) -> dict[str, dict]:
+    """Register keypads and associated entities in the device registry."""
+    keypad_devices_by_dr_id: dict[str, dict] = {}
+    device_registry = dr.async_get(hass)
+    bridge_serial = bridge_device["serial"]
+
+    keypad_devices = bridge.get_devices_by_domain("keypad")
+    for keypad in keypad_devices:
+        keypad_device_id = keypad["device_id"]
+        area = keypad["area_name"]
+        device_args: dict[str, Any] = {
+            "name": f"{keypad['control_station_name']} {keypad['name']}",
+            "manufacturer": MANUFACTURER,
+            "config_entry_id": config_entry_id,
+            "identifiers": {(DOMAIN, f"{bridge_serial}_{keypad_device_id}")},
+            "model": f"{keypad['model']} ({keypad['type']})",
+            "via_device": (DOMAIN, bridge_device["serial"]),
+        }
+        if area != UNASSIGNED_AREA:
+            device_args["suggested_area"] = area
+
+        dr_device = device_registry.async_get_or_create(**device_args)
+        keypad_devices_by_dr_id[dr_device.id] = keypad
+
+        # Register buttons from this keypad
+        # for button_group in keypad["button_groups"].values():
+        #    for button in button_group["buttons"].values():
+        #        _async_register_keypad_button(
+        #            hass, config_entry_id, bridge_device, device_args, button
+        #        )
+
+    return keypad_devices_by_dr_id
+
+
+@callback
+def _async_register_keypad_button(
+    hass: HomeAssistant,
+    config_entry_id: str,
+    bridge_device: dict,
+    keypad_device_args: dict,
+    button: dict,
+) -> dict[str, dict]:
+    """Register a keypad button."""
+    device_registry = dr.async_get(hass)
+    bridge_serial = bridge_device["serial"]
+    parent_identifier = None
+    for identifier in keypad_device_args["identifiers"]:
+        # there should be only one identifier even though it's a set, just unpacking it
+        parent_identifier = identifier
+    device_args: dict[str, Any] = {
+        "name": f"{keypad_device_args['name']} {button['name']}",
+        "manufacturer": MANUFACTURER,
+        "config_entry_id": config_entry_id,
+        "identifiers": {(DOMAIN, f"{bridge_serial}_{button['device_id']}")},
+        "model": f"{keypad_device_args['model']}",
+        "via_device": parent_identifier,
+    }
+
+    area = keypad_device_args.get("suggested_area")
+    if area != UNASSIGNED_AREA:
+        device_args["suggested_area"] = area
+
+    dr_device = device_registry.async_get_or_create(**device_args)
+    return {dr_device.id: button}
 
 
 @callback
