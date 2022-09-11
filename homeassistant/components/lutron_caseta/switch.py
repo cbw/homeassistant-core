@@ -36,6 +36,9 @@ async def async_setup_entry(
     keypad_devices = bridge.get_devices_by_domain("keypad")
     for keypad in keypad_devices:
         keypad_device_id = keypad["device_id"]
+        if keypad.get("area_name") is None:
+            # legacy Caseta Pico device - ignore
+            continue
         area = keypad["area_name"]
         device_args: dict[str, Any] = {
             "name": f"{keypad['control_station_name']} {keypad['name']}",

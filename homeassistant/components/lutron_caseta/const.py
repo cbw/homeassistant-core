@@ -18,9 +18,13 @@ MANUFACTURER = "Lutron Electronics Co., Inc"
 
 ATTR_SERIAL = "serial"
 ATTR_TYPE = "type"
+ATTR_MODEL = "model"
 ATTR_LEAP_BUTTON_NUMBER = "leap_button_number"
 ATTR_BUTTON_NUMBER = "button_number"  # LIP button number
+ATTR_BUTTON_NAME = "button_name"
+ATTR_BUTTON_ID = "button_id"
 ATTR_DEVICE_NAME = "device_name"
+ATTR_KEYPAD_ID = "keypad_id"
 ATTR_AREA_NAME = "area_name"
 ATTR_ACTION = "action"
 

@@ -240,12 +240,22 @@ def _async_register_keypad_devices(
     keypad_devices = bridge.get_devices_by_domain("keypad")
     for keypad in keypad_devices:
         keypad_device_id = keypad["device_id"]
-        area = keypad["area_name"]
+        # Handle legacy Pico device naming
+        area, name = _area_and_name_from_name(keypad["name"])
+        if keypad.get("area_name") is not None:
+            # new control station model
+            area = keypad["area_name"]
+        if keypad.get("control_station_name") is not None:
+            name = f"{keypad['control_station_name']} {keypad['name']}"
+        identifier = f"{bridge_serial}_{keypad_device_id}"
+        if keypad.get("serial") is not None:
+            identifier = keypad.get("serial")
+
         device_args: dict[str, Any] = {
-            "name": f"{keypad['control_station_name']} {keypad['name']}",
+            "name": name,
             "manufacturer": MANUFACTURER,
             "config_entry_id": config_entry_id,
-            "identifiers": {(DOMAIN, f"{bridge_serial}_{keypad_device_id}")},
+            "identifiers": {(DOMAIN, identifier)},
             "model": f"{keypad['model']} ({keypad['type']})",
             "via_device": (DOMAIN, bridge_device["serial"]),
         }
@@ -482,7 +492,6 @@ class LutronCasetaDeviceUpdatableEntity(LutronCasetaDevice):
     async def async_update(self) -> None:
         """Update when forcing a refresh of the device."""
         self._device = self._smartbridge.get_device_by_id(self.device_id)
-        _LOGGER.debug(self._device)
 
 
 def _id_to_identifier(lutron_id: str) -> tuple[str, str]:
